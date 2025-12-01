@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThermoSolver Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        .calculated-field {
+            animation: highlight 1.5s ease-out;
+            background-color: #f0fdf4 !important; /* green-50 */
+            border-color: #22c55e !important;
+        }
+
+        @keyframes highlight {
+            0% { background-color: #dcfce7; transform: scale(1.02); }
+            100% { background-color: #f0fdf4; transform: scale(1); }
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #4f46e5;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        
+        .device-card { transition: all 0.3s ease; }
+        .device-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                        <i class="fas fa-fire-flame-curved text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">ThermoSolver Pro</h1>
+                        <p class="text-xs text-gray-500 font-medium">Universal Thermodynamics & Coupled Systems</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="hidden md:flex bg-gray-100 rounded-lg p-1">
+                        <button onclick="setGlobalTemp('C')" id="global-c" class="px-3 py-1 text-sm font-semibold rounded bg-white shadow text-gray-800 transition-all">°C</button>
+                        <button onclick="setGlobalTemp('K')" id="global-k" class="px-3 py-1 text-sm font-semibold rounded text-gray-500 hover:text-gray-800 transition-all">K</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Mode Tabs -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden flex flex-col sm:flex-row">
+            <button onclick="setAppMode('single')" id="tab-single" class="flex-1 py-4 px-6 text-center font-semibold text-indigo-600 bg-indigo-50 border-b-2 sm:border-b-0 sm:border-r border-indigo-100 hover:bg-indigo-50 transition-colors">
+                <i class="fas fa-cube mr-2"></i> Single Device Solver
+            </button>
+            <button onclick="setAppMode('coupled')" id="tab-coupled" class="flex-1 py-4 px-6 text-center font-semibold text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-link mr-2"></i> Coupled Systems (Series/Driven)
+            </button>
+        </div>
+
+        <!-- ================= SINGLE DEVICE MODE ================= -->
+        <div id="view-single" class="space-y-6">
+            <!-- Device Type Selector -->
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <button onclick="setSingleDeviceType('engine')" id="btn-single-engine" class="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-sm transition-all text-center">
+                    <i class="fas fa-gears block text-2xl mb-2"></i> Heat Engine
+                </button>
+                <button onclick="setSingleDeviceType('refrigerator')" id="btn-single-refrigerator" class="p-4 rounded-xl border-2 border-transparent bg-white text-gray-500 hover:border-cyan-400 hover:text-cyan-600 font-bold shadow-sm transition-all text-center">
+                    <i class="fas fa-snowflake block text-2xl mb-2"></i> Refrigerator
+                </button>
+                <button onclick="setSingleDeviceType('pump')" id="btn-single-pump" class="p-4 rounded-xl border-2 border-transparent bg-white text-gray-500 hover:border-orange-400 hover:text-orange-600 font-bold shadow-sm transition-all text-center">
+                    <i class="fas fa-temperature-arrow-up block text-2xl mb-2"></i> Heat Pump
+                </button>
+            </div>
+
+            <!-- Single Device Inputs -->
+            <div id="single-device-container"></div> 
+            <!-- Container is populated by JS -->
+        </div>
+
+
+        <!-- ================= COUPLED SYSTEMS MODE ================= -->
+        <div id="view-coupled" class="hidden space-y-8">
+            
+            <!-- System Topology Selector -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><i class="fas fa-network-wired"></i></div>
+                    <span class="font-bold text-gray-700">System Topology:</span>
+                </div>
+                <div class="flex gap-2 bg-gray-100 p-1 rounded-lg overflow-x-auto">
+                    <button onclick="setCouplingMode('series_he')" id="couple-series" class="px-4 py-2 text-sm font-semibold rounded bg-white shadow text-gray-800 whitespace-nowrap">Series Heat Engines</button>
+                    <button onclick="setCouplingMode('eng_drives_ref')" id="couple-drive" class="px-4 py-2 text-sm font-semibold rounded text-gray-500 hover:bg-gray-200 whitespace-nowrap">Engine Drives Fridge</button>
+                </div>
+            </div>
+
+            <!-- Visual Diagram -->
+            <div class="flex flex-col lg:flex-row gap-6 items-stretch justify-center">
+                
+                <!-- Device A -->
+                <div class="flex-1 min-w-[300px]" id="device-a-wrapper">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Linkage -->
+                <div class="flex flex-col items-center justify-center p-4 text-gray-400 gap-2">
+                    <div id="coupling-icon" class="text-3xl text-indigo-500"><i class="fas fa-arrow-right"></i></div>
+                    <div id="coupling-label" class="text-xs font-bold uppercase tracking-wider text-center bg-indigo-100 text-indigo-700 px-2 py-1 rounded">Q_Reject = Q_Supply</div>
+                    <button onclick="solveCoupled()" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95">
+                        SOLVE SYSTEM
+                    </button>
+                    <button onclick="resetCoupled()" class="mt-2 text-xs font-semibold text-gray-400 hover:text-red-500 underline">Reset</button>
+                </div>
+
+                <!-- Device B -->
+                <div class="flex-1 min-w-[300px]" id="device-b-wrapper">
+                    <!-- Populated by JS -->
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Templates (Hidden) -->
+    <template id="device-template">
+        <div class="device-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative">
+            <div class="h-2 w-full device-color-bar bg-gray-400"></div>
+            <div class="p-6">
+                <!-- Header -->
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800 device-title">Device Name</h3>
+                        <p class="text-xs text-gray-500 device-subtitle">Input known values</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer group relative">
+                            <input type="checkbox" class="carnot-check w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span class="text-xs font-bold text-gray-500 group-hover:text-indigo-600 transition-colors">Carnot</span>
+                            <!-- Tooltip -->
+                            <div class="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Assume Ideal/Reversible cycle (Max Efficiency)
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Inputs -->
+                <div class="space-y-4">
+                    
+                    <!-- Temp High -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1 lbl-th">T Source</label>
+                            <input type="number" step="any" class="inp-th w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" placeholder="Temp">
+                        </div>
+                        <div class="w-16 pb-2.5 text-sm font-medium text-gray-400 text-center unit-temp">°C</div>
+                    </div>
+
+                    <!-- Temp Low -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1 lbl-tl">T Sink</label>
+                            <input type="number" step="any" class="inp-tl w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" placeholder="Temp">
+                        </div>
+                        <div class="w-16 pb-2.5 text-sm font-medium text-gray-400 text-center unit-temp">°C</div>
+                    </div>
+
+                    <div class="h-px bg-gray-100 my-2"></div>
+
+                    <!-- Energy High -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1 lbl-qh">Q Supply</label>
+                            <input type="number" step="any" class="inp-qh w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" placeholder="Energy">
+                        </div>
+                        <select class="unit-qh w-24 p-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 outline-none">
+                            <option value="kW">kW</option>
+                            <option value="kJmin">kJ/min</option>
+                            <option value="W">W</option>
+                            <option value="MW">MW</option>
+                            <option value="kJ">kJ</option>
+                        </select>
+                    </div>
+
+                    <!-- Energy Low -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1 lbl-ql">Q Reject</label>
+                            <input type="number" step="any" class="inp-ql w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" placeholder="Energy">
+                        </div>
+                        <select class="unit-ql w-24 p-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 outline-none">
+                            <option value="kW">kW</option>
+                            <option value="kJmin">kJ/min</option>
+                            <option value="W">W</option>
+                            <option value="MW">MW</option>
+                            <option value="kJ">kJ</option>
+                        </select>
+                    </div>
+
+                    <!-- Work -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Work (W)</label>
+                            <input type="number" step="any" class="inp-w w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" placeholder="Work">
+                        </div>
+                        <select class="unit-w w-24 p-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 outline-none">
+                            <option value="kW">kW</option>
+                            <option value="kJmin">kJ/min</option>
+                            <option value="W">W</option>
+                            <option value="MW">MW</option>
+                            <option value="kJ">kJ</option>
+                        </select>
+                    </div>
+
+                    <!-- Efficiency/COP -->
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-grow">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1 lbl-perf">Efficiency / COP</label>
+                            <input type="number" step="any" class="inp-perf w-full p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Result">
+                        </div>
+                        <div class="w-16 pb-2.5 text-sm font-medium text-gray-400 text-center lbl-perf-unit"></div>
+                    </div>
+
+                </div>
+
+                <!-- Single Mode Solve Button -->
+                <button class="btn-solve w-full mt-6 bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 rounded-lg shadow transition-all active:scale-95 hidden">
+                    Calculate
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // State
+        let appMode = 'single'; // 'single' or 'coupled'
+        let globalTempUnit = 'C';
+        let singleType = 'engine';
+        let couplingMode = 'series_he'; // 'series_he', 'eng_drives_ref'
+
+        // Constants
+        const unitFactors = {
+            'kW': 1, // Base
+            'W': 0.001,
+            'MW': 1000,
+            'kJmin': 1/60,
+            'kJ': 1 // Treated as magnitude, assumes consistent time basis if mixed
+        };
+
+        const types = {
+            engine: { 
+                title: "Heat Engine", color: "bg-rose-500", 
+                labels: { th: "T Source (High)", tl: "T Sink (Low)", qh: "Q Supply (In)", ql: "Q Reject (Out)", perf: "Efficiency (η)" }, 
+                perfUnit: "%" 
+            },
+            refrigerator: { 
+                title: "Refrigerator", color: "bg-cyan-500", 
+                labels: { th: "T Surroundings", tl: "T Freezer", qh: "Q Rejected", ql: "Q Absorbed", perf: "COP" }, 
+                perfUnit: "" 
+            },
+            pump: { 
+                title: "Heat Pump", color: "bg-emerald-500", 
+                labels: { th: "T Room", tl: "T Outside", qh: "Q Delivered", ql: "Q Absorbed", perf: "COP" }, 
+                perfUnit: "" 
+            }
+        };
+
+        // --- DOM Elements & Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSingleDevice();
+            renderCoupledDevices();
+        });
+
+        function setAppMode(mode) {
+            appMode = mode;
+            document.getElementById('view-single').classList.toggle('hidden', mode !== 'single');
+            document.getElementById('view-coupled').classList.toggle('hidden', mode !== 'coupled');
+            
+            // Tab Styles
+            const tSingle = document.getElementById('tab-single');
+            const tCoupled = document.getElementById('tab-coupled');
+            if(mode === 'single') {
+                tSingle.className = "flex-1 py-4 px-6 text-center font-semibold text-indigo-600 bg-indigo-50 border-b-2 sm:border-b-0 sm:border-r border-indigo-100 transition-colors";
+                tCoupled.className = "flex-1 py-4 px-6 text-center font-semibold text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-colors";
+            } else {
+                tSingle.className = "flex-1 py-4 px-6 text-center font-semibold text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-colors";
+                tCoupled.className = "flex-1 py-4 px-6 text-center font-semibold text-indigo-600 bg-indigo-50 border-b-2 sm:border-b-0 sm:border-l border-indigo-100 transition-colors";
+            }
+        }
+
+        function setGlobalTemp(unit) {
+            globalTempUnit = unit;
+            document.getElementById('global-c').className = unit === 'C' ? "px-3 py-1 text-sm font-bold rounded bg-white shadow text-gray-800 transition-all" : "px-3 py-1 text-sm font-medium rounded text-gray-500 hover:text-gray-800 transition-all";
+            document.getElementById('global-k').className = unit === 'K' ? "px-3 py-1 text-sm font-bold rounded bg-white shadow text-gray-800 transition-all" : "px-3 py-1 text-sm font-medium rounded text-gray-500 hover:text-gray-800 transition-all";
+            
+            // Update all labels
+            document.querySelectorAll('.unit-temp').forEach(el => el.innerText = '°' + unit);
+            // Trigger Recalculate if values exist? For now, we assume user switches unit BEFORE typing or understands it's a label switch. 
+            // Ideally we convert values, but simple label switch is safer for standard homework solvers.
+        }
+
+        // --- Single Device Logic ---
+        function setSingleDeviceType(type) {
+            singleType = type;
+            // Update UI buttons
+            ['engine', 'refrigerator', 'pump'].forEach(t => {
+                const btn = document.getElementById(`btn-single-${t}`);
+                if (t === type) {
+                    btn.className = `p-4 rounded-xl border-2 border-${getColorBase(t)}-600 bg-${getColorBase(t)}-50 text-${getColorBase(t)}-700 font-bold shadow-md transform scale-105 transition-all text-center`;
+                } else {
+                    btn.className = "p-4 rounded-xl border-2 border-transparent bg-white text-gray-500 hover:bg-gray-50 font-bold shadow-sm transition-all text-center opacity-70 hover:opacity-100";
+                }
+            });
+            renderSingleDevice();
+        }
+
+        function getColorBase(type) {
+            if(type === 'engine') return 'indigo'; // Using indigo for Engine in single mode for clean look
+            if(type === 'refrigerator') return 'cyan';
+            return 'emerald';
+        }
+
+        function renderSingleDevice() {
+            const container = document.getElementById('single-device-container');
+            container.innerHTML = '';
+            const el = createDeviceElement('single-dev', singleType, true);
+            container.appendChild(el);
+        }
+
+        // --- Coupled Logic ---
+        function setCouplingMode(mode) {
+            couplingMode = mode;
+            // Update Buttons
+            const btnSeries = document.getElementById('couple-series');
+            const btnDrive = document.getElementById('couple-drive');
+            
+            const activeClass = "px-4 py-2 text-sm font-bold rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 whitespace-nowrap";
+            const inactiveClass = "px-4 py-2 text-sm font-semibold rounded text-gray-500 hover:bg-gray-200 whitespace-nowrap";
+
+            if (mode === 'series_he') {
+                btnSeries.className = activeClass;
+                btnDrive.className = inactiveClass;
+                document.getElementById('coupling-icon').innerHTML = '<i class="fas fa-fire-arrow-down"></i>';
+                document.getElementById('coupling-label').innerText = "Q Reject (A) = Q Supply (B)";
+            } else {
+                btnSeries.className = inactiveClass;
+                btnDrive.className = activeClass;
+                document.getElementById('coupling-icon').innerHTML = '<i class="fas fa-gear"></i>';
+                document.getElementById('coupling-label').innerText = "Work Out (A) = Work In (B)";
+            }
+            renderCoupledDevices();
+        }
+
+        function renderCoupledDevices() {
+            const wrapA = document.getElementById('device-a-wrapper');
+            const wrapB = document.getElementById('device-b-wrapper');
+            wrapA.innerHTML = '';
+            wrapB.innerHTML = '';
+
+            let typeA = 'engine';
+            let typeB = 'engine'; // Default for series
+
+            if (couplingMode === 'eng_drives_ref') {
+                typeB = 'refrigerator';
+            }
+
+            // Create elements (No solve button, solve is central)
+            wrapA.appendChild(createDeviceElement('dev-a', typeA, false));
+            wrapB.appendChild(createDeviceElement('dev-b', typeB, false));
+
+            // Add titles
+            wrapA.querySelector('.device-title').innerText += " A";
+            wrapB.querySelector('.device-title').innerText += " B";
+        }
+
+
+        // --- Core Factory ---
+        function createDeviceElement(id, type, hasSolveBtn) {
+            const tmpl = document.getElementById('device-template');
+            const clone = tmpl.content.cloneNode(true);
+            const root = clone.querySelector('.device-card');
+            
+            root.id = id;
+            root.dataset.type = type;
+
+            // Styles
+            const config = types[type];
+            root.querySelector('.device-color-bar').className = `h-2 w-full ${config.color}`;
+            root.querySelector('.device-title').innerText = config.title;
+            
+            // Labels
+            root.querySelector('.lbl-th').innerText = config.labels.th;
+            root.querySelector('.lbl-tl').innerText = config.labels.tl;
+            root.querySelector('.lbl-qh').innerText = config.labels.qh;
+            root.querySelector('.lbl-ql').innerText = config.labels.ql;
+            root.querySelector('.lbl-perf').innerText = config.labels.perf;
+            root.querySelector('.lbl-perf-unit').innerText = config.perfUnit;
+            root.querySelectorAll('.unit-temp').forEach(e => e.innerText = '°' + globalTempUnit);
+
+            // Solve Button
+            const btn = root.querySelector('.btn-solve');
+            if(hasSolveBtn) {
+                btn.classList.remove('hidden');
+                btn.onclick = () => solveDevice(id);
+            }
+
+            return root;
+        }
+
+
+        // --- Calculation Engine ---
+
+        function getDeviceValues(id) {
+            const root = document.getElementById(id);
+            const getVal = (cls) => {
+                const v = root.querySelector('.' + cls).value;
+                return v === "" ? null : parseFloat(v);
+            };
+            const getUnit = (cls) => root.querySelector('.' + cls).value;
+
+            return {
+                type: root.dataset.type,
+                isCarnot: root.querySelector('.carnot-check').checked,
+                th: getVal('inp-th'),
+                tl: getVal('inp-tl'),
+                qh: getVal('inp-qh'), qhUnit: getUnit('unit-qh'),
+                ql: getVal('inp-ql'), qlUnit: getUnit('unit-ql'),
+                w: getVal('inp-w'),   wUnit: getUnit('unit-w'),
+                perf: getVal('inp-perf')
+            };
+        }
+
+        function setDeviceValue(id, field, value) {
+            const root = document.getElementById(id);
+            const inp = root.querySelector('.inp-' + field);
+            if (inp.value === "") {
+                inp.value = Number.isInteger(value) ? value : value.toPrecision(5);
+                inp.classList.add('calculated-field');
+                setTimeout(() => inp.classList.remove('calculated-field'), 1500);
+            }
+        }
+
+        function toBase(val, unit) {
+            if (val === null) return null;
+            return val * unitFactors[unit];
+        }
+
+        function fromBase(val, unit) {
+            if (val === null) return null;
+            return val / unitFactors[unit];
+        }
+
+        function toK(val) { return val === null ? null : (globalTempUnit === 'C' ? val + 273.15 : val); }
+        function fromK(val) { return val === null ? null : (globalTempUnit === 'C' ? val - 273.15 : val); }
+
+        // Generic Single Device Solver
+        function solveDeviceLogic(data) {
+            // Normalize inputs to base units (kW for power, K for temp)
+            let th = toK(data.th);
+            let tl = toK(data.tl);
+            let qh = toBase(data.qh, data.qhUnit);
+            let ql = toBase(data.ql, data.qlUnit);
+            let w = toBase(data.w, data.wUnit);
+            let perf = data.perf;
+            
+            if (data.type === 'engine' && perf !== null) perf = perf / 100;
+
+            let changed = true;
+            let loops = 0;
+
+            while (changed && loops < 5) {
+                changed = false;
+                let startStr = JSON.stringify({th, tl, qh, ql, w, perf});
+
+                // 1. First Law (Energy Balance) |W| = |QH| - |QL|
+                if (qh !== null && ql !== null && w === null) w = Math.abs(qh - ql);
+                if (w !== null && ql !== null && qh === null) qh = w + ql;
+                if (qh !== null && w !== null && ql === null) ql = Math.abs(qh - w);
+
+                // 2. Efficiency / COP
+                if (data.type === 'engine') {
+                    if (w !== null && qh !== null && perf === null) perf = w / qh;
+                    if (perf !== null && qh !== null && w === null) w = perf * qh;
+                    if (perf !== null && w !== null && qh === null) qh = w / perf;
+                } else if (data.type === 'refrigerator') {
+                    if (ql !== null && w !== null && perf === null) perf = ql / w;
+                    if (perf !== null && w !== null && ql === null) ql = perf * w;
+                    if (perf !== null && ql !== null && w === null) w = ql / perf;
+                } else if (data.type === 'pump') {
+                    if (qh !== null && w !== null && perf === null) perf = qh / w;
+                    if (perf !== null && w !== null && qh === null) qh = perf * w;
+                    if (perf !== null && qh !== null && w === null) w = qh / perf;
+                }
+
+                // 3. Carnot (Temps)
+                let carnotPerf = null;
+                if (th !== null && tl !== null) {
+                    if (data.type === 'engine') carnotPerf = 1 - (tl/th);
+                    if (data.type === 'refrigerator') carnotPerf = tl / (th - tl);
+                    if (data.type === 'pump') carnotPerf = th / (th - tl);
+                }
+
+                // If Carnot Mode Checked -> Link Perf and Temps
+                if (data.isCarnot) {
+                    if (carnotPerf !== null && perf === null) perf = carnotPerf;
+                    if (perf !== null && carnotPerf === null) {
+                        // Reverse calculate Temps if one is known
+                         if (data.type === 'engine') {
+                            if (th !== null) tl = th * (1 - perf);
+                            else if (tl !== null) th = tl / (1 - perf);
+                        } else if (data.type === 'refrigerator') {
+                            if (th !== null) tl = (perf * th) / (1 + perf);
+                            else if (tl !== null) th = (tl * (1 + perf)) / perf;
+                        } else if (data.type === 'pump') {
+                            if (th !== null) tl = (th * (perf - 1)) / perf;
+                            else if (tl !== null) th = (perf * tl) / (perf - 1);
+                        }
+                    }
+                }
+
+                if (JSON.stringify({th, tl, qh, ql, w, perf}) !== startStr) changed = true;
+                loops++;
+            }
+
+            return {
+                th: fromK(th),
+                tl: fromK(tl),
+                qh: fromBase(qh, data.qhUnit),
+                ql: fromBase(ql, data.qlUnit),
+                w: fromBase(w, data.wUnit),
+                perf: (data.type === 'engine' && perf !== null) ? perf * 100 : perf
+            };
+        }
+
+        function solveDevice(id) {
+            const data = getDeviceValues(id);
+            const res = solveDeviceLogic(data);
+            
+            if (res.th !== null) setDeviceValue(id, 'th', res.th);
+            if (res.tl !== null) setDeviceValue(id, 'tl', res.tl);
+            if (res.qh !== null) setDeviceValue(id, 'qh', res.qh);
+            if (res.ql !== null) setDeviceValue(id, 'ql', res.ql);
+            if (res.w !== null) setDeviceValue(id, 'w', res.w);
+            if (res.perf !== null) setDeviceValue(id, 'perf', res.perf);
+        }
+
+        // --- Coupled Solver ---
+        function solveCoupled() {
+            // 1. Solve A and B individually as much as possible
+            solveDevice('dev-a');
+            solveDevice('dev-b');
+
+            // 2. Apply Coupling Logic
+            let dataA = getDeviceValues('dev-a');
+            let dataB = getDeviceValues('dev-b');
+
+            // Convert to base units for comparison
+            let qlA = toBase(dataA.ql, dataA.qlUnit);
+            let qhB = toBase(dataB.qh, dataB.qhUnit);
+            let wA = toBase(dataA.w, dataA.wUnit);
+            let wB = toBase(dataB.w, dataB.wUnit);
+
+            // Series Heat Engine: Q_Reject_A = Q_Supply_B
+            // Also T_Sink_A = T_Source_B (Thermal Equilibrium)
+            if (couplingMode === 'series_he') {
+                // Link Heat
+                if (qlA !== null && qhB === null) setDeviceValue('dev-b', 'qh', fromBase(qlA, dataB.qhUnit));
+                if (qhB !== null && qlA === null) setDeviceValue('dev-a', 'ql', fromBase(qhB, dataA.qlUnit));
+                
+                // Link Temps (Sink A = Source B)
+                if (dataA.tl !== null && dataB.th === null) setDeviceValue('dev-b', 'th', dataA.tl);
+                if (dataB.th !== null && dataA.tl === null) setDeviceValue('dev-a', 'tl', dataB.th);
+            }
+
+            // Engine Drives Fridge: Work_Out_A = Work_In_B
+            if (couplingMode === 'eng_drives_ref') {
+                if (wA !== null && wB === null) setDeviceValue('dev-b', 'w', fromBase(wA, dataB.wUnit));
+                if (wB !== null && wA === null) setDeviceValue('dev-a', 'w', fromBase(wB, dataA.wUnit));
+            }
+
+            // 3. Solve again with new coupled values
+            solveDevice('dev-a');
+            solveDevice('dev-b');
+        }
+
+        function resetCoupled() {
+            renderCoupledDevices();
+        }
+
+    </script>
+</body>
+</html>
